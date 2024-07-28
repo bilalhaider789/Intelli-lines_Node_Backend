@@ -8,7 +8,7 @@ const HttpError = require("../models/http-error");
 const { response } = require("express");
 
 const demo = async (req, res, next) => {
-  console.log("requested")
+  console.log("requested user")
   const data= ( await User.find());
   return res.status(200).json(data);
 };
@@ -34,10 +34,15 @@ const signup = async (req, res, next) => {
     name,
     email,
     password,
+    package: "free",
+    expiry: new Date()
   });
   try {
     createduser.save();
     console.log("user added");
+    let expiryDate = new Date(createduser.expiry);
+    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    const formattedExpiryDate = expiryDate.toLocaleDateString('en-US', options);
     res
       .status(201)
       .json({
@@ -46,6 +51,8 @@ const signup = async (req, res, next) => {
         email: createduser.email,
         success: true,
         actor: "user",
+        package: createduser.package,
+        expiry: formattedExpiryDate
       });
   } catch (e) {
     console.log("Error in signup");
@@ -66,10 +73,15 @@ const login = async (req, res, next) => {
     // return next( new HttpError("User of this credentials do not  exists", 422))
     return null;
   }
+  let expiryDate = new Date(existingUsesr.expiry);
+  const options = { day: 'numeric', month: 'long', year: 'numeric' };
+  const formattedExpiryDate = expiryDate.toLocaleDateString('en-US', options);
   res.json({
     userid: existingUsesr.id,
     name: existingUsesr.name,
     email: existingUsesr.email,
+    package: existingUsesr.package,
+    expiry: existingUsesr.expiry,
     success: true,
     actor: "user",
   });
@@ -108,11 +120,15 @@ const socialogin=async(req,res,next)=>{
     console.log("error in finding user");
   }
   if (existingUsesr) {
-    
+    let expiryDate = new Date(existingUsesr.expiry);
+    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    const formattedExpiryDate = expiryDate.toLocaleDateString('en-US', options);
     return res.json({
       userid: existingUsesr.id,
       name: existingUsesr.name,
       email: existingUsesr.email,
+      package:existingUsesr.package,
+      expiry: formattedExpiryDate,
       success: true,
       actor: "user",
     });
@@ -122,16 +138,23 @@ const socialogin=async(req,res,next)=>{
     name,
     email,
     password,
+    package: "free",
+    expiry: new Date()
   });
   try {
     createduser.save();
     console.log("user added");
+    const expiryDate = new Date(createduser.expiry);
+    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    const formattedExpiryDate = expiryDate.toLocaleDateString('en-US', options);
     return res
       .status(201)
       .json({
         userid: createduser.id,
         name: createduser.name,
         email: createduser.email,
+        package: createduser.package,
+        expiry: formattedExpiryDate,
         success: true,
         actor: "user",
       });
@@ -160,10 +183,14 @@ const resetpas = async (req, res, next) => {
     
     return res.send("Could not update user");
   }
-
+  expiryDate = new Date(user.expiry);
+  let options = { day: 'numeric', month: 'long', year: 'numeric' };
+  let formattedExpiryDate = expiryDate.toLocaleDateString('en-US', options);
   res.status(200).json({ userid: user.id,
     name: user.name,
     email: user.email,
+    package: user.package,
+    expiry: formattedExpiryDate,
     success: true,
     actor: "user",});
 };
@@ -194,6 +221,39 @@ const changepass = async (req, res, next) => {
 };
 
 
+const subscribe = async (req, res, next) => {
+  const { email,package } = req.body;
+  console.log(package)
+  let user;
+  try {
+    user = await User.findOne({ email: email });
+  } catch (err) {
+    return res.send("User not fount");
+  }
+  let currentDate = new Date(); 
+  let expiryDate = new Date();
+  expiryDate.setMonth(currentDate.getMonth() + 1);
+  user.package=package;
+  user.expiry=expiryDate
+  try {
+    await user.save();
+  } catch (err) {
+    
+    return res.send("Could not update user");
+  }
+  expiryDate = new Date(user.expiry);
+  let options = { day: 'numeric', month: 'long', year: 'numeric' };
+  let formattedExpiryDate = expiryDate.toLocaleDateString('en-US', options);
+  res.status(200).json({ userid: user.id,
+    name: user.name,
+    email: user.email,
+    package: user.package,
+    expiry:formattedExpiryDate,
+    success: true,
+    actor: "user",});
+};
+
+
 exports.changepass=changepass;
 exports.socialogin=socialogin;
 exports.resetpas=resetpas;
@@ -201,6 +261,7 @@ exports.forget = forget;
 exports.login = login;
 exports.signup = signup;
 exports.demo = demo;
+exports.subscribe = subscribe;
 
 function sendemail(otp, email) {
   return new Promise((resolve, reject) => {
@@ -229,3 +290,4 @@ function sendemail(otp, email) {
     });
   });
 }
+
